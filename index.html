@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Parleto recruitment task</title>
+		<style>
+			table,
+			th,
+			td {
+				border: 1px solid black;
+				border-collapse: collapse;
+			}
+
+			.table-head__month,
+			.table-head__category-day,
+			.table-head__expenses {
+				border: 1px solid red;
+			}
+
+			#summaryTable {
+				min-width: 300px;
+			}
+
+			.table-head__month {
+				width: 33%;
+			}
+
+			.table-head__category-day-expenses {
+				width: 67%;
+			}
+
+			.table-head__category-day-expenses > table {
+				width: 100%;
+			}
+
+			.table-head__category-day-expenses th {
+				width: 50%;
+			}
+
+			.table-element__category-day-expenses > table {
+				width: 100%;
+			}
+
+			.table-element__category-total {
+				width: 50%;
+			}
+		</style>
+	</head>
+	<body>
+		<button id="openAddExpenseModal">Add expense</button>
+		<dialog id="addExpenseModal">
+			<form method="dialog" id="addExpenseForm">
+				<label for="dateAddExpense">Date</label>
+				<input type="date" id="dateAddExpense" />
+				<label for="categoryAddExpense">Category</label>
+				<select class="category" id="categoryAddExpense"></select>
+				<label for="amountAddExpense">Amount</label>
+				<input type="number" id="amountAddExpense" />
+				<button id="addExpense" type="button">Add</button>
+				<button class="close-modal" id="closeAddExpenseModal" type="button">x</button>
+				<div class="success-message" id="addExpenseModalSuccess"></div>
+				<div class="error-message" id="addExpenseModalError"></div>
+			</form>
+		</dialog>
+		<button id="openRemoveExpenseModal">Remove expense</button>
+		<dialog id="removeExpenseModal">
+			<form method="dialog" id="removeExpenseForm">
+				<label for="dateRemoveExpense">Date</label>
+				<input type="date" id="dateRemoveExpense" />
+				<label for="categoryRemoveExpense">Category</label>
+				<select class="category" id="categoryRemoveExpense"></select>
+				<label for="amountRemoveExpense">Amount</label>
+				<input type="number" id="amountRemoveExpense" />
+				<button id="removeExpense" type="button">Remove</button>
+				<button class="close-modal" id="closeRemoveExpenseModal" type="button">x</button>
+				<div class="success-message" id="removeExpenseModalSuccess"></div>
+				<div class="error-message" id="removeExpenseModalError"></div>
+			</form>
+		</dialog>
+		<button id="openFilterModal">Filter</button>
+		<dialog id="filterModal">
+			<form method="dialog" id="filterForm">
+				<label for="dateFilter">Date</label>
+				<input type="month" id="dateFilter" />
+				<label for="categoryFilter">Category</label>
+				<select class="category" id="categoryFilter">
+					<option value="food">Food</option>
+					<option value="fuel">Fuel</option>
+					<option value="other">Other</option>
+				</select>
+				<label for="minAmount">Min Amount</label>
+				<input type="number" id="minAmount" />
+				<label for="maxAmount">Max Amount</label>
+				<input type="number" id="maxAmount" />
+				<button id="setFilter" type="button">Filter</button>
+				<button class="close-modal" id="closeFilterModal" type="button">x</button>
+			</form>
+		</dialog>
+		<button id="clearFilter" type="button">Clear filters</button>
+		<button id="openAddCategoryModal">Add category</button>
+		<dialog id="addCategoryModal">
+			<form method="dialog" id="addCategoryForm">
+				<label for="addCategory">Category</label>
+				<input type="text" id="addCategory" />
+				<div id="addCategoryError"></div>
+				<button id="addCategoryBtn" type="button">Add</button>
+				<button class="close-modal" id="closeAddCategoryModal" type="button">x</button>
+			</form>
+		</dialog>
+		<button id="openRemoveCategoryModal">Remove category</button>
+		<dialog id="removeCategoryModal">
+			<form method="dialog" id="removeCategoryForm">
+				<label for="removeCategory">Category</label>
+				<select class="category" id="removeCategory"></select>
+				<button id="removeCategoryBtn" type="button">Remove</button>
+				<button class="close-modal" id="closeRemoveCategoryModal" type="button">x</button>
+			</form>
+		</dialog>
+		<table id="summaryTable">
+			<thead>
+				<tr class="table-head">
+					<th class="table-head__month">Month</th>
+					<th class="table-head__category-day-expenses">
+						<table>
+							<tr>
+								<th class="table-head__category-day">Category/Day</th>
+								<th class="table-head__expenses">Expenses</th>
+							</tr>
+						</table>
+					</th>
+				</tr>
+			</thead>
+			<tbody id="summaryTableBody"></tbody>
+		</table>
+
+		<script>
+			categories = new Set(['food', 'fuel', 'other']);
+			function renderCategories() {
+				const categorySelect = document.querySelectorAll('select.category');
+				categorySelect.forEach(function (select) {
+					// Clear existing options
+					select.innerHTML = '';
+
+					// Add new options
+					categories.forEach(function (category) {
+						const option = document.createElement('option');
+						option.value = category;
+						option.text = category;
+						select.add(option);
+					});
+				});
+			}
+
+			expenses = [
+				new Map([
+					['date', '2023-04-02'],
+					['category', 'food'],
+					['amount', '9'],
+				]),
+				new Map([
+					['date', '2023-10-29'],
+					['category', 'fuel'],
+					['amount', '99'],
+				]),
+				new Map([
+					['date', '2023-10-29'],
+					['category', 'fuel'],
+					['amount', '93'],
+				]),
+				new Map([
+					['date', '2023-10-29'],
+					['category', 'food'],
+					['amount', '14'],
+				]),
+				new Map([
+					['date', '2023-10-13'],
+					['category', 'fuel'],
+					['amount', '99'],
+				]),
+			];
+
+			//get array of numbers representing days in a month
+			function getDaysInMonth(monthYear) {
+				const year = parseInt(monthYear.split('-')[0]);
+				const month = parseInt(monthYear.split('-')[1]);
+				return new Date(year, month, 0).getDate();
+			}
+
+			months = new Map();
+			function calculateMonths() {
+				//create a new map with month as key and an array of expenses as value
+				const monthExpenses = new Map();
+				expenses.forEach(expense => {
+					const month = expense.get('date').slice(0, 7);
+					const day = Number(expense.get('date').slice(8));
+
+					if (monthExpenses.has(month)) {
+						//another expense for this month
+						monthExpenses.get(month).push(expense);
+						if (months.get(month).get('expenses').has(day)) {
+							//another expense for this day
+							months.get(month).get('expenses').get(day).get('amount').push(expense.get('amount'));
+						} else {
+							//first expense for this day
+							months
+								.get(month)
+								.get('expenses')
+								.set(day, [expense.get('amount')]);
+						}
+					} else {
+						//first expense for this month
+						monthExpenses.set(month, [expense]);
+						months.set(month, new Map());
+						months.get(month).set('name', month);
+						months.get(month).set('days', getDaysInMonth(month));
+						months.get(month).set('expenses', new Map());
+						months.get(month).get('expenses').set(day, new Map());
+						months
+							.get(month)
+							.get('expenses')
+							.get(day)
+							.set('amount', [expense.get('amount')]);
+					}
+				});
+
+				console.log('1: ', months);
+
+				monthExpenses.forEach((monthExpensesArray, month) => {
+					//add up all expenses for each month
+					const total = monthExpensesArray.reduce((acc, expense) => {
+						return acc + Number(expense.get('amount'));
+					}, 0);
+					months.get(month).set('total', total);
+
+					//add up all expenses for each category
+					months.get(month).set('categories', new Map());
+					const categoryExpenses = new Map();
+					monthExpensesArray.forEach(expense => {
+						const category = expense.get('category');
+						if (categoryExpenses.has(category)) {
+							categoryExpenses.get(category).push(expense);
+						} else {
+							categoryExpenses.set(category, [expense]);
+							months.get(month).get('categories').set(category, new Map());
+						}
+					});
+					categoryExpenses.forEach((categoryExpensesArray, category) => {
+						const total = categoryExpensesArray.reduce((acc, expense) => {
+							return acc + Number(expense.get('amount'));
+						}, 0);
+						months.get(month).get('categories').get(category).set('total', total);
+						months.get(month).get('categories').get(category).set('name', category);
+					});
+				});
+
+				console.log('2: ', months);
+			}
+
+			function getAmountParentElement(monthYear, day, category) {
+				let elements = document.querySelectorAll('.table-element__month-year');
+				let filteredElements = Array.from(elements).filter(el => el.innerText.trim() === monthYear);
+				const monthElement = filteredElements[0].nextElementSibling;
+				elements = monthElement.getElementsByClassName(category);
+				filteredElements = Array.from(elements).filter(el => {
+					let childElement = el.querySelector('.table-element__day');
+					return childElement && Number(childElement.innerText.trim()) === day;
+				});
+				const dayAmountsElement = filteredElements[0];
+				const result = dayAmountsElement.querySelector('.table-element__amount').parentNode;
+				return result;
+			}
+
+			function renderExpenses() {
+				calculateMonths();
+
+				//remove all rows from the table except for head
+				const tableBody = document.getElementById('summaryTableBody');
+				const rows = tableBody.querySelectorAll('.table-element');
+				rows.forEach(row => {
+					row.remove();
+				});
+
+				//render new rows
+				months.forEach(month => {
+					const element = document.createElement('tr');
+					element.classList.add('table-element');
+
+					//elements created once for each month
+					const monthYear = document.createElement('td');
+					monthYear.classList.add('table-element__month-year');
+					monthYear.textContent = month.get('name');
+					const categoryDayExpenses = document.createElement('td');
+					categoryDayExpenses.classList.add('table-element__category-day-expenses');
+					const categoryDayExpensesTable = document.createElement('table');
+					const monthTotal = document.createElement('tr');
+					monthTotal.classList.add('table-element__month-total');
+					monthTotal.classList.add('table-element__month-total');
+					const monthTotalTd = document.createElement('td');
+					monthTotalTd.setAttribute('colspan', '2');
+					monthTotalTd.textContent = `total: ${month.get('total')}`;
+					monthTotal.appendChild(monthTotalTd);
+					categoryDayExpensesTable.appendChild(monthTotal);
+
+					//elements created for each category
+					month.get('categories').forEach(category => {
+						const categoryTr = document.createElement('tr');
+						categoryTr.classList.add('table-element__category');
+						const categoryName = document.createElement('td');
+						categoryName.classList.add('table-element__category-name');
+						categoryName.textContent = category.get('name');
+						const categoryTotal = document.createElement('td');
+						categoryTotal.classList.add('table-element__category-total');
+						categoryTotal.textContent = `total: ${category.get('total')}`;
+						categoryTr.appendChild(categoryName);
+						categoryTr.appendChild(categoryTotal);
+						categoryDayExpensesTable.appendChild(categoryTr);
+
+						//elements created for each day
+						for (let i = 1; i <= month.get('days'); i++) {
+							const dayAmounts = document.createElement('tr');
+							dayAmounts.classList.add('table-element__day-amounts', `${category.get('name')}`);
+							const dayTd = document.createElement('td');
+							dayTd.classList.add('table-element__day');
+							dayTd.textContent = i;
+							const amountsTd = document.createElement('td');
+							amountsTd.classList.add('table-element__amounts');
+							const amountsTable = document.createElement('table');
+							const amountsTr = document.createElement('tr');
+							const amountTd = document.createElement('td');
+							amountTd.classList.add('table-element__amount', 'table-element__amount--empty');
+							amountTd.textContent = '-';
+
+							dayAmounts.appendChild(dayTd);
+							amountsTr.appendChild(amountTd);
+							amountsTable.appendChild(amountsTr);
+							amountsTd.appendChild(amountsTable);
+							dayAmounts.appendChild(amountsTd);
+							categoryDayExpensesTable.appendChild(dayAmounts);
+						}
+					});
+
+					categoryDayExpenses.appendChild(categoryDayExpensesTable);
+					element.appendChild(monthYear);
+					element.appendChild(categoryDayExpenses);
+					tableBody.appendChild(element);
+				});
+
+				//elements created for each expense
+				expenses.forEach(expense => {
+					const expenseCategory = expense.get('category');
+					const expenseDate = expense.get('date');
+					const expenseMonthYear = expenseDate.slice(0, 7);
+					const expenseDay = Number(expenseDate.slice(8));
+					const expenseAmount = expense.get('amount');
+
+					const amountTd = document.createElement('td');
+					amountTd.classList.add('table-element__amount');
+					amountTd.textContent = expenseAmount;
+
+					const parentElement = getAmountParentElement(expenseMonthYear, expenseDay, expenseCategory);
+					parentElement.appendChild(amountTd);
+					if (parentElement.querySelector('.table-element__amount--empty')) {
+						//if there is an empty cell, remove it
+						parentElement.querySelector('.table-element__amount--empty').remove();
+					}
+				});
+			}
+
+			function addExpense() {
+				const date = document.getElementById('dateAddExpense').value;
+				const category = document.getElementById('categoryAddExpense').value;
+				const amount = document.getElementById('amountAddExpense').value;
+				const newExpense = new Map();
+
+				newExpense.set('date', date);
+				newExpense.set('category', category);
+				newExpense.set('amount', amount);
+
+				const oldLength = expenses.length;
+				expenses.push(newExpense);
+				const newLength = expenses.length;
+
+				if (newLength === oldLength + 1) {
+					console.log('Adding to the array was successful');
+					renderExpenses();
+					return true;
+				} else {
+					console.log('Adding to the array was not successful');
+					return false;
+				}
+			}
+
+			function removeExpense() {
+				const date = document.getElementById('dateRemoveExpense').value;
+				const category = document.getElementById('categoryRemoveExpense').value;
+				const amount = document.getElementById('amountRemoveExpense').value;
+				let result = expenses.find(
+					map => map.get('date') === date && map.get('category') === category && map.get('amount') === amount
+				);
+				console.log('expenses: ', expenses);
+				console.log('remove this result: ', result);
+
+				if (result) {
+					expenses = expenses.filter(expense => expense !== result);
+					console.log('expenses after remove: ', expenses);
+					renderExpenses();
+					return true;
+				} else {
+					console.log('No such expense found');
+					return false;
+				}
+			}
+
+			(function init() {
+				renderCategories();
+				renderExpenses();
+			})();
+
+			(function addExpenseModal() {
+				const expenseModal = document.getElementById('addExpenseModal');
+				const openExpenseModal = document.getElementById('openAddExpenseModal');
+				const closeExpenseModal = document.getElementById('closeAddExpenseModal');
+				const addExpenseBtn = document.getElementById('addExpense');
+
+				openExpenseModal.addEventListener('click', function () {
+					expenseModal.showModal();
+				});
+
+				closeExpenseModal.addEventListener('click', function () {
+					expenseModal.close();
+				});
+
+				addExpenseBtn.addEventListener('click', function () {
+					const result = addExpense();
+					if (result) {
+						document.getElementById('addExpenseModalSuccess').textContent = 'Expense added successfully';
+					} else {
+						document.getElementById('addExpenseModalError').textContent = 'Error adding expense';
+					}
+					setTimeout(function () {
+						expenseModal.close();
+					}, 2000);
+				});
+			})();
+
+			(function removeExpenseModal() {
+				const expenseModal = document.getElementById('removeExpenseModal');
+				const openExpenseModal = document.getElementById('openRemoveExpenseModal');
+				const closeExpenseModal = document.getElementById('closeRemoveExpenseModal');
+				const removeExpenseBtn = document.getElementById('removeExpense');
+
+				openExpenseModal.addEventListener('click', function () {
+					expenseModal.showModal();
+				});
+
+				closeExpenseModal.addEventListener('click', function () {
+					expenseModal.close();
+				});
+
+				removeExpenseBtn.addEventListener('click', function () {
+					const result = removeExpense();
+					if (result) {
+						document.getElementById('removeExpenseModalSuccess').textContent = 'Expense removed successfully';
+					} else {
+						document.getElementById('removeExpenseModalError').textContent = 'Error removing expense';
+					}
+					setTimeout(function () {
+						expenseModal.close();
+					}, 2000);
+				});
+			})();
+
+			(function filterModal() {
+				const filterModal = document.getElementById('filterModal');
+				const openFilterModal = document.getElementById('openFilterModal');
+				const closeFilterModal = document.getElementById('closeFilterModal');
+				const setFilter = document.getElementById('setFilter');
+
+				openFilterModal.addEventListener('click', function () {
+					filterModal.showModal();
+				});
+
+				closeFilterModal.addEventListener('click', function () {
+					filterModal.close();
+				});
+
+				setFilter.addEventListener('click', function () {
+					filterModal.close();
+				});
+			})();
+
+			(function clearFilter() {
+				const clearFilter = document.getElementById('clearFilter');
+				clearFilter.addEventListener('click', function () {
+					document.getElementById('filterForm').reset();
+				});
+			})();
+
+			(function addCategoryModal() {
+				const addCategoryModal = document.getElementById('addCategoryModal');
+				const openAddCategoryModal = document.getElementById('openAddCategoryModal');
+				const closeAddCategoryModal = document.getElementById('closeAddCategoryModal');
+				const addCategoryBtn = document.getElementById('addCategoryBtn');
+				const addCategory = document.getElementById('addCategory');
+
+				renderCategories();
+
+				openAddCategoryModal.addEventListener('click', function () {
+					addCategoryModal.showModal();
+				});
+
+				closeAddCategoryModal.addEventListener('click', function () {
+					addCategoryModal.close();
+				});
+
+				addCategoryBtn.addEventListener('click', function () {
+					const newCategory = addCategory.value;
+					const errorDiv = document.getElementById('addCategoryError');
+					if (categories.has(newCategory)) {
+						errorDiv.textContent = 'This category already exists.';
+					} else {
+						categories.add(newCategory);
+						renderCategories();
+						addCategoryModal.close();
+						errorDiv.textContent = ''; // clear the error message
+					}
+				});
+			})();
+
+			(function removeCategoryModal() {
+				const removeCategoryModal = document.getElementById('removeCategoryModal');
+				const openRemoveCategoryModal = document.getElementById('openRemoveCategoryModal');
+				const closeRemoveCategoryModal = document.getElementById('closeRemoveCategoryModal');
+				const removeCategoryBtn = document.getElementById('removeCategoryBtn');
+
+				openRemoveCategoryModal.addEventListener('click', function () {
+					removeCategoryModal.showModal();
+				});
+
+				closeRemoveCategoryModal.addEventListener('click', function () {
+					removeCategoryModal.close();
+				});
+
+				removeCategoryBtn.addEventListener('click', function () {
+					const removeCategory = document.getElementById('removeCategory');
+					const selectedCategory = removeCategory.value;
+
+					categories.delete(selectedCategory);
+					renderCategories();
+					removeCategoryModal.close();
+				});
+			})();
+		</script>
+	</body>
+</html>

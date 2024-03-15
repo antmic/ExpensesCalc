@@ -174,21 +174,29 @@
 		<script>
 			categories = new Set(['food', 'fuel', 'other']);
 			function renderCategories() {
-				const categorySelect = document.querySelectorAll('select.category');
-				categorySelect.forEach(function (select) {
-					// Clear existing options
-					select.innerHTML = '';
+				const categorySelects = document.querySelectorAll('select.category');
+				const removeCategory = document.getElementById('removeCategory');
+				const categoryFilter = document.getElementById('categoryFilter');
 
-					// Add new options
-					categories.forEach(function (category) {
-						const option = document.createElement('option');
-						option.value = category;
-						option.text = category;
-						select.add(option);
-					});
+				// Create a document fragment to hold the new options
+				const fragment = document.createDocumentFragment();
+
+				// Add new options
+				categories.forEach(category => {
+					const option = document.createElement('option');
+					option.value = category;
+					option.text = category;
+					fragment.appendChild(option);
 				});
 
-				const removeCategory = document.getElementById('removeCategory');
+				// Populate select elements with categories
+				categorySelects.forEach(select => {
+					// Clear existing options
+					select.innerHTML = '';
+					select.appendChild(fragment.cloneNode(true));
+				});
+
+				// Remove 'other' option from 'removeCategory' select element
 				for (let i = 0; i < removeCategory.options.length; i++) {
 					if (removeCategory.options[i].value === 'other') {
 						removeCategory.remove(i);
@@ -196,7 +204,7 @@
 					}
 				}
 
-				const categoryFilter = document.getElementById('categoryFilter');
+				// Add 'empty' option to 'filterCategory' select element
 				let option = new Option('', '');
 				option.selected = true;
 				categoryFilter.add(option, 0);
@@ -251,7 +259,7 @@
 				);
 				filtersLocal.set('category', selectedCategories);
 				document.getElementById('showCategoryFilter').textContent =
-					selectedCategories.length > 1 ? 'category (' + selectedCategories.join(', ') + ');' : '';
+					selectedCategories[0] !== '' ? 'category (' + selectedCategories.join(', ') + ');' : '';
 				const minAmount = document.getElementById('minAmount').value;
 				filtersLocal.set('minAmount', minAmount);
 				document.getElementById('showMinAmountFilter').textContent = minAmount ? `min amount (${minAmount});` : '';
@@ -265,7 +273,7 @@
 					const expenseAmount = expense.get('amount');
 					return (
 						(!date || expenseDate === date) &&
-						(selectedCategories.length <= 1 || selectedCategories.includes(expenseCategory)) &&
+						(selectedCategories[0] === '' || selectedCategories.includes(expenseCategory)) &&
 						(!minAmount || Number(expenseAmount) >= Number(minAmount)) &&
 						(!maxAmount || Number(expenseAmount) <= Number(maxAmount))
 					);
@@ -443,28 +451,44 @@
 				});
 			}
 
-			function addExpense() {
-				const date = document.getElementById('dateAddExpense').value;
-				const category = document.getElementById('categoryAddExpense').value;
-				const amount = document.getElementById('amountAddExpense').value;
-				const newExpense = new Map();
+			function validateDate(date) {
+				const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+				return dateRegex.test(date);
+			}
 
-				newExpense.set('date', date);
-				newExpense.set('category', category);
-				newExpense.set('amount', amount);
+			function validateCategory(category) {
+				return categories.has(category);
+			}
 
-				const oldLength = expenses.length;
-				expenses.push(newExpense);
-				const newLength = expenses.length;
+			function validateAmount(amount) {
+				const amountRegex = /^\d+(\.\d{1,2})?$/;
+				return amountRegex.test(amount);
+			}
 
-				if (newLength === oldLength + 1) {
-					//push expenses to storage
-					localStorage.setItem('expenses', JSON.stringify(expenses.map(map => Object.fromEntries(map))));
-					renderExpenses();
-					return true;
-				} else {
-					return false;
+			function validateString(str) {
+				const regex = /^[a-zA-Z0-9\s/()']+$/;
+				return regex.test(str);
+			}
+
+			function areAllTruthy(...args) {
+				for (let arg of args) {
+					if (!arg) {
+						return false;
+					}
 				}
+				return true;
+			}
+
+			function addExpense(date, category, amount) {
+				const newExpense = new Map([
+					['date', date],
+					['category', category],
+					['amount', amount],
+				]);
+				expenses.push(newExpense);
+				//push expenses to storage
+				localStorage.setItem('expenses', JSON.stringify(expenses.map(map => Object.fromEntries(map))));
+				renderExpenses();
 			}
 
 			function removeExpense() {
@@ -519,6 +543,9 @@
 				const openExpenseModal = document.getElementById('openAddExpenseModal');
 				const closeExpenseModal = document.getElementById('closeAddExpenseModal');
 				const addExpenseBtn = document.getElementById('addExpense');
+				const addExpenseForm = document.getElementById('addExpenseForm');
+				const addExpenseModalSuccess = document.getElementById('addExpenseModalSuccess');
+				const addExpenseModalError = document.getElementById('addExpenseModalError');
 
 				openExpenseModal.addEventListener('click', function () {
 					expenseModal.showModal();
@@ -529,15 +556,41 @@
 				});
 
 				addExpenseBtn.addEventListener('click', function () {
-					const result = addExpense();
-					if (result) {
-						document.getElementById('addExpenseModalSuccess').textContent = 'Expense added successfully';
+					const date = document.getElementById('dateAddExpense').value;
+					const category = document.getElementById('categoryAddExpense').value;
+					const amount = document.getElementById('amountAddExpense').value;
+					if (!areAllTruthy(date, category, amount)) {
+						addExpenseModalError.textContent = 'All fields are required';
+						setTimeout(function () {
+							addExpenseModalError.textContent = '';
+						}, 4000);
+					} else if (!validateDate(date)) {
+						addExpenseModalError.textContent = 'Invalid date';
+						setTimeout(function () {
+							date = '';
+							addExpenseModalError.textContent = '';
+						}, 4000);
+					} else if (!validateCategory) {
+						addExpenseModalError.textContent = 'Invalid category';
+						setTimeout(function () {
+							category = '';
+							addExpenseModalError.textContent = '';
+						}, 4000);
+					} else if (!validateAmount(amount)) {
+						addExpenseModalError.textContent = 'Invalid amount';
+						setTimeout(function () {
+							amount = '';
+							addExpenseModalError.textContent = '';
+						}, 4000);
 					} else {
-						document.getElementById('addExpenseModalError').textContent = 'Error adding expense';
+						addExpense(date, category, amount);
+						addExpenseModalSuccess.textContent = 'Expense added successfully';
+						setTimeout(function () {
+							addExpenseModalSuccess.textContent = '';
+							expenseModal.close();
+							addExpenseForm.reset();
+						}, 2000);
 					}
-					setTimeout(function () {
-						expenseModal.close();
-					}, 2000);
 				});
 			})();
 
@@ -596,7 +649,6 @@
 				const clearFilter = document.getElementById('clearFilter');
 				clearFilter.addEventListener('click', function () {
 					document.getElementById('filterForm').reset();
-					filteredExpenses = [];
 					renderExpenses();
 				});
 			})();
@@ -607,34 +659,51 @@
 				const closeAddCategoryModal = document.getElementById('closeAddCategoryModal');
 				const addCategoryBtn = document.getElementById('addCategoryBtn');
 				const addCategory = document.getElementById('addCategory');
+				const addCategoryForm = document.getElementById('addCategoryForm');
 
 				openAddCategoryModal.addEventListener('click', function () {
 					addCategoryModal.showModal();
 				});
 
 				closeAddCategoryModal.addEventListener('click', function () {
+					addCategoryForm.reset();
 					addCategoryModal.close();
 				});
 
 				addCategoryBtn.addEventListener('click', function () {
 					const newCategory = addCategory.value;
-					const errorDiv = document.getElementById('addCategoryError');
+					const addCategoryError = document.getElementById('addCategoryError');
+					const addCategorySuccess = document.getElementById('addCategorySuccess');
 					if (categories.has(newCategory)) {
-						errorDiv.textContent = 'This category already exists.';
+						addCategoryError.textContent = 'This category already exists.';
 						setTimeout(function () {
-							document.getElementById('addCategoryForm').reset();
-							errorDiv.textContent = '';
+							addCategoryForm.reset();
+							addCategoryError.textContent = '';
 						}, 4000);
-					} else {
+					} else if (validateString(newCategory)) {
 						categories.add(newCategory);
 						//push categories to storage
 						localStorage.setItem('categories', JSON.stringify(Array.from(categories)));
 						renderCategories();
-						document.getElementById('addCategorySuccess').textContent = 'Category added successfully';
+						addCategorySuccess.textContent = 'Category added successfully';
 						setTimeout(function () {
+							addCategorySuccess.textContent = '';
+							addCategoryForm.reset();
 							addCategoryModal.close();
 						}, 2000);
-						errorDiv.textContent = ''; // clear the error message
+						addCategoryError.textContent = ''; // clear the error message
+					} else if (newCategory === '') {
+						addCategoryError.textContent = 'Category name is required';
+						setTimeout(function () {
+							addCategoryError.textContent = '';
+						}, 4000);
+					} else {
+						addCategoryError.textContent =
+							"Invalid category name (only letters, numbers, spaces, /, (, ) and ' are allowed)";
+						setTimeout(function () {
+							addCategoryForm.reset();
+							addCategoryError.textContent = '';
+						}, 4000);
 					}
 				});
 			})();
@@ -644,12 +713,16 @@
 				const openRemoveCategoryModal = document.getElementById('openRemoveCategoryModal');
 				const closeRemoveCategoryModal = document.getElementById('closeRemoveCategoryModal');
 				const removeCategoryBtn = document.getElementById('removeCategoryBtn');
+				const removeCategoryForm = document.getElementById('removeCategoryForm');
+				const removeCategorySuccess = document.getElementById('removeCategorySuccess');
+				const removeCategoryError = document.getElementById('removeCategoryError');
 
 				openRemoveCategoryModal.addEventListener('click', function () {
 					removeCategoryModal.showModal();
 				});
 
 				closeRemoveCategoryModal.addEventListener('click', function () {
+					removeCategoryForm.reset();
 					removeCategoryModal.close();
 				});
 
@@ -657,10 +730,10 @@
 					const removeCategory = document.getElementById('removeCategory');
 					const selectedCategory = removeCategory.value;
 					if (selectedCategory === 'other') {
-						document.getElementById('removeCategoryError').textContent = 'Category  "other" cannot be removed';
+						removeCategoryError.textContent = 'Category  "other" cannot be removed';
 						setTimeout(function () {
-							document.getElementById('removeCategoryError').textContent = '';
-							document.getElementById('removeCategoryForm').reset();
+							removeCategoryError.textContent = '';
+							removeCategoryForm.reset();
 							removeCategoryModal.close();
 						}, 2000);
 					} else {
@@ -674,9 +747,11 @@
 						localStorage.setItem('categories', JSON.stringify(Array.from(categories)));
 						renderCategories();
 						renderExpenses();
-						document.getElementById('removeCategorySuccess').textContent = 'Category removed successfully';
+						removeCategorySuccess.textContent = 'Category removed successfully';
 						setTimeout(function () {
+							removeCategorySuccess.textContent = '';
 							removeCategoryModal.close();
+							removeCategoryForm.reset();
 						}, 2000);
 					}
 				});

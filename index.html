@@ -115,11 +115,7 @@
 				<label for="dateFilter">Date</label>
 				<input type="month" id="dateFilter" />
 				<label for="categoryFilter">Category</label>
-				<select class="category" id="categoryFilter" multiple>
-					<option value="food">Food</option>
-					<option value="fuel">Fuel</option>
-					<option value="other">Other</option>
-				</select>
+				<select class="category" id="categoryFilter" multiple></select>
 				<label for="minAmount">Min Amount</label>
 				<input type="number" id="minAmount" />
 				<label for="maxAmount">Max Amount</label>
@@ -153,6 +149,7 @@
 				<label for="removeCategory">Category</label>
 				<select class="category" id="removeCategory"></select>
 				<button id="removeCategoryBtn" type="button">Remove</button>
+				<div id="removeCategoryError"></div>
 				<div id="removeCategorySuccess"></div>
 				<button class="close-modal" id="closeRemoveCategoryModal" type="button">x</button>
 			</form>
@@ -191,6 +188,14 @@
 					});
 				});
 
+				const removeCategory = document.getElementById('removeCategory');
+				for (let i = 0; i < removeCategory.options.length; i++) {
+					if (removeCategory.options[i].value === 'other') {
+						removeCategory.remove(i);
+						break;
+					}
+				}
+
 				const categoryFilter = document.getElementById('categoryFilter');
 				let option = new Option('', '');
 				option.selected = true;
@@ -199,27 +204,27 @@
 
 			expenses = [
 				new Map([
-					['date', '2024-04-02'],
+					['date', '2024-03-02'],
 					['category', 'food'],
 					['amount', '9'],
 				]),
 				new Map([
-					['date', '2024-04-29'],
+					['date', '2024-03-02'],
 					['category', 'fuel'],
 					['amount', '99'],
 				]),
 				new Map([
-					['date', '2023-10-29'],
+					['date', '2024-01-29'],
 					['category', 'fuel'],
 					['amount', '93'],
 				]),
 				new Map([
-					['date', '2023-10-29'],
+					['date', '2024-01-29'],
 					['category', 'food'],
 					['amount', '14'],
 				]),
 				new Map([
-					['date', '2023-10-13'],
+					['date', '2024-01-29'],
 					['category', 'fuel'],
 					['amount', '99'],
 				]),
@@ -651,14 +656,29 @@
 				removeCategoryBtn.addEventListener('click', function () {
 					const removeCategory = document.getElementById('removeCategory');
 					const selectedCategory = removeCategory.value;
-					categories.delete(selectedCategory);
-					//push categories to storage
-					localStorage.setItem('categories', JSON.stringify(Array.from(categories)));
-					renderCategories();
-					document.getElementById('removeCategorySuccess').textContent = 'Category removed successfully';
-					setTimeout(function () {
-						removeCategoryModal.close();
-					}, 2000);
+					if (selectedCategory === 'other') {
+						document.getElementById('removeCategoryError').textContent = 'Category  "other" cannot be removed';
+						setTimeout(function () {
+							document.getElementById('removeCategoryError').textContent = '';
+							document.getElementById('removeCategoryForm').reset();
+							removeCategoryModal.close();
+						}, 2000);
+					} else {
+						categories.delete(selectedCategory);
+						expenses.forEach(expense => {
+							if (expense.get('category') === selectedCategory) {
+								expense.set('category', 'other');
+							}
+						});
+						//push categories to storage
+						localStorage.setItem('categories', JSON.stringify(Array.from(categories)));
+						renderCategories();
+						renderExpenses();
+						document.getElementById('removeCategorySuccess').textContent = 'Category removed successfully';
+						setTimeout(function () {
+							removeCategoryModal.close();
+						}, 2000);
+					}
 				});
 			})();
 		</script>

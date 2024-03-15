@@ -172,45 +172,13 @@
 		</table>
 
 		<script>
-			categories = new Set(['food', 'fuel', 'other']);
-			function renderCategories() {
-				const categorySelects = document.querySelectorAll('select.category');
-				const removeCategory = document.getElementById('removeCategory');
-				const categoryFilter = document.getElementById('categoryFilter');
+			'use strict';
+			const errorTimeout = 4000;
+			const successTimeout = 2000;
 
-				// Create a document fragment to hold the new options
-				const fragment = document.createDocumentFragment();
+			const defaultCategories = new Set(['food', 'fuel', 'other']);
 
-				// Add new options
-				categories.forEach(category => {
-					const option = document.createElement('option');
-					option.value = category;
-					option.text = category;
-					fragment.appendChild(option);
-				});
-
-				// Populate select elements with categories
-				categorySelects.forEach(select => {
-					// Clear existing options
-					select.innerHTML = '';
-					select.appendChild(fragment.cloneNode(true));
-				});
-
-				// Remove 'other' option from 'removeCategory' select element
-				for (let i = 0; i < removeCategory.options.length; i++) {
-					if (removeCategory.options[i].value === 'other') {
-						removeCategory.remove(i);
-						break;
-					}
-				}
-
-				// Add 'empty' option to 'filterCategory' select element
-				let option = new Option('', '');
-				option.selected = true;
-				categoryFilter.add(option, 0);
-			}
-
-			expenses = [
+			const defaultExpenses = [
 				new Map([
 					['date', '2024-03-02'],
 					['category', 'food'],
@@ -238,8 +206,67 @@
 				]),
 			];
 
-			function sortExpenses() {
-				let sortedExpenses = expenses.slice();
+			let expenses = [];
+			let categories = new Set();
+
+			function sanitizeCategories() {
+				const sanitizedCategories = categories.filter(category => {
+					if (validateCategory(category)) {
+						return category;
+					}
+				});
+				categories = sanitizedCategories;
+				localStorage.setItem('categories', JSON.stringify(Array.from(categories)));
+				return sanitizedCategories;
+			}
+
+			function renderCategories() {
+				const categorySelects = document.querySelectorAll('select.category');
+				const removeCategory = document.getElementById('removeCategory');
+				const categoryFilter = document.getElementById('categoryFilter');
+				const fragment = document.createDocumentFragment();
+				const sanitizedCategoriesLocal = sanitizeCategories();
+
+				sanitizedCategoriesLocal.forEach(category => {
+					const option = document.createElement('option');
+					option.value = category;
+					option.text = category;
+					fragment.appendChild(option);
+				});
+
+				categorySelects.forEach(select => {
+					select.innerHTML = '';
+					select.appendChild(fragment.cloneNode(true));
+				});
+
+				for (let i = 0; i < removeCategory.options.length; i++) {
+					if (removeCategory.options[i].value === 'other') {
+						removeCategory.remove(i);
+						break;
+					}
+				}
+
+				let option = new Option('', '');
+				option.selected = true;
+				categoryFilter.add(option, 0);
+			}
+
+			function sanitizeExpenses() {
+				const sanitizedExpenses = expenses.filter(expense => {
+					const date = expense.get('date');
+					const category = expense.get('category');
+					const amount = expense.get('amount');
+					if (validateDate(date) && validateCategory(category) && validateAmount(amount)) {
+						return expense;
+					}
+				});
+				expenses = sanitizedExpenses;
+				localStorage.setItem('expenses', JSON.stringify(expenses.map(map => Object.fromEntries(map))));
+				return sanitizedExpenses;
+			}
+
+			function sortExpenses(expensesArr) {
+				let sortedExpenses = expensesArr.slice();
 				sortedExpenses.sort((a, b) => {
 					return a.get('date') > b.get('date') ? 1 : -1;
 				});
@@ -247,7 +274,8 @@
 			}
 
 			function filterExpenses() {
-				const sortedExpensesLocal = sortExpenses();
+				const sanitizedExpensesLocal = sanitizeExpenses();
+				const sortedExpensesLocal = sortExpenses(sanitizedExpensesLocal);
 				let filteredExpensesLocal = [];
 				let filtersLocal = new Map();
 
@@ -290,7 +318,7 @@
 			}
 
 			function calculateMonths(expensesArr) {
-				monthsLocal = new Map();
+				let monthsLocal = new Map();
 				//create a new map with month as key and an array of expenses as value
 				const monthExpenses = new Map();
 				expensesArr.forEach(expense => {
@@ -461,7 +489,7 @@
 			}
 
 			function validateAmount(amount) {
-				const amountRegex = /^\d+(\.\d{1,2})?$/;
+				const amountRegex = /^\d{1,7}(\.\d{1,2})?$/;
 				return amountRegex.test(amount);
 			}
 
@@ -486,8 +514,6 @@
 					['amount', amount],
 				]);
 				expenses.push(newExpense);
-				//push expenses to storage
-				localStorage.setItem('expenses', JSON.stringify(expenses.map(map => Object.fromEntries(map))));
 				renderExpenses();
 			}
 
@@ -498,11 +524,8 @@
 				let result = expenses.find(
 					map => map.get('date') === date && map.get('category') === category && map.get('amount') === amount
 				);
-
 				if (result) {
 					expenses = expenses.filter(expense => expense !== result);
-					//push expenses to storage
-					localStorage.setItem('expenses', JSON.stringify(expenses.map(map => Object.fromEntries(map))));
 					renderExpenses();
 					return true;
 				} else {
@@ -511,19 +534,13 @@
 			}
 
 			function loadDataFromStorage() {
-				//load categories from storage
 				if (localStorage.getItem('categories') === null) {
-					// myData does not exist in localStorage
 				} else {
-					// myData exists in localStorage
 					let retrievedCategoriesSet = new Set(JSON.parse(localStorage.getItem('categories')));
 					categories = retrievedCategoriesSet;
 				}
-				//load expenses from storage
 				if (localStorage.getItem('expenses') === null) {
-					// expenses does not exist in localStorage
 				} else {
-					// expenses exists in localStorage
 					let retrievedExpensesArray = JSON.parse(localStorage.getItem('expenses')).map(
 						obj => new Map(Object.entries(obj))
 					);
@@ -532,7 +549,6 @@
 			}
 
 			(function init() {
-				//load categories and expenses from storage
 				loadDataFromStorage();
 				renderCategories();
 				renderExpenses();
@@ -552,44 +568,42 @@
 				});
 
 				closeExpenseModal.addEventListener('click', function () {
+					addExpenseForm.reset();
 					expenseModal.close();
 				});
 
 				addExpenseBtn.addEventListener('click', function () {
-					const date = document.getElementById('dateAddExpense').value;
-					const category = document.getElementById('categoryAddExpense').value;
-					const amount = document.getElementById('amountAddExpense').value;
-					if (!areAllTruthy(date, category, amount)) {
+					const date = document.getElementById('dateAddExpense');
+					const category = document.getElementById('categoryAddExpense');
+					const amount = document.getElementById('amountAddExpense');
+					if (!areAllTruthy(date.value, category.value, amount.value)) {
 						addExpenseModalError.textContent = 'All fields are required';
 						setTimeout(function () {
 							addExpenseModalError.textContent = '';
-						}, 4000);
-					} else if (!validateDate(date)) {
+						}, errorTimeout);
+					} else if (!validateDate(date.value)) {
 						addExpenseModalError.textContent = 'Invalid date';
 						setTimeout(function () {
-							date = '';
 							addExpenseModalError.textContent = '';
-						}, 4000);
-					} else if (!validateCategory) {
+						}, errorTimeout);
+					} else if (!validateCategory(category.value)) {
 						addExpenseModalError.textContent = 'Invalid category';
 						setTimeout(function () {
-							category = '';
 							addExpenseModalError.textContent = '';
-						}, 4000);
-					} else if (!validateAmount(amount)) {
+						}, errorTimeout);
+					} else if (!validateAmount(amount.value)) {
 						addExpenseModalError.textContent = 'Invalid amount';
 						setTimeout(function () {
-							amount = '';
 							addExpenseModalError.textContent = '';
-						}, 4000);
+						}, errorTimeout);
 					} else {
-						addExpense(date, category, amount);
+						addExpense(date.value, category.value, amount.value);
 						addExpenseModalSuccess.textContent = 'Expense added successfully';
 						setTimeout(function () {
 							addExpenseModalSuccess.textContent = '';
 							expenseModal.close();
 							addExpenseForm.reset();
-						}, 2000);
+						}, successTimeout);
 					}
 				});
 			})();
@@ -599,28 +613,33 @@
 				const openExpenseModal = document.getElementById('openRemoveExpenseModal');
 				const closeExpenseModal = document.getElementById('closeRemoveExpenseModal');
 				const removeExpenseBtn = document.getElementById('removeExpense');
+				const removeExpenseForm = document.getElementById('removeExpenseForm');
+				const removeExpenseModalSuccess = document.getElementById('removeExpenseModalSuccess');
+				const removeExpenseModalError = document.getElementById('removeExpenseModalError');
 
 				openExpenseModal.addEventListener('click', function () {
 					expenseModal.showModal();
 				});
 
 				closeExpenseModal.addEventListener('click', function () {
+					removeExpenseForm.reset();
 					expenseModal.close();
 				});
 
 				removeExpenseBtn.addEventListener('click', function () {
 					const result = removeExpense();
 					if (result) {
-						document.getElementById('removeExpenseModalSuccess').textContent = 'Expense removed successfully';
+						removeExpenseModalSuccess.textContent = 'Expense removed successfully';
 						setTimeout(function () {
+							removeExpenseModalSuccess.textContent = '';
+							removeExpenseForm.reset();
 							expenseModal.close();
-						}, 2000);
+						}, successTimeout);
 					} else {
-						document.getElementById('removeExpenseModalError').textContent = 'No such expense found';
+						removeExpenseModalError.textContent = 'No such expense found';
 						setTimeout(function () {
-							document.getElementById('removeExpenseForm').reset();
-							document.getElementById('removeExpenseModalError').textContent = '';
-						}, 4000);
+							removeExpenseModalError.textContent = '';
+						}, errorTimeout);
 					}
 				});
 			})();
@@ -675,35 +694,32 @@
 					const addCategoryError = document.getElementById('addCategoryError');
 					const addCategorySuccess = document.getElementById('addCategorySuccess');
 					if (categories.has(newCategory)) {
-						addCategoryError.textContent = 'This category already exists.';
+						addCategoryError.textContent = `Category '${newCategory}' already exists.`;
 						setTimeout(function () {
-							addCategoryForm.reset();
 							addCategoryError.textContent = '';
-						}, 4000);
+						}, errorTimeout);
 					} else if (validateString(newCategory)) {
 						categories.add(newCategory);
 						//push categories to storage
-						localStorage.setItem('categories', JSON.stringify(Array.from(categories)));
 						renderCategories();
 						addCategorySuccess.textContent = 'Category added successfully';
 						setTimeout(function () {
 							addCategorySuccess.textContent = '';
 							addCategoryForm.reset();
 							addCategoryModal.close();
-						}, 2000);
+						}, successTimeout);
 						addCategoryError.textContent = ''; // clear the error message
 					} else if (newCategory === '') {
 						addCategoryError.textContent = 'Category name is required';
 						setTimeout(function () {
 							addCategoryError.textContent = '';
-						}, 4000);
+						}, errorTimeout);
 					} else {
 						addCategoryError.textContent =
 							"Invalid category name (only letters, numbers, spaces, /, (, ) and ' are allowed)";
 						setTimeout(function () {
-							addCategoryForm.reset();
 							addCategoryError.textContent = '';
-						}, 4000);
+						}, errorTimeout);
 					}
 				});
 			})();
@@ -735,7 +751,7 @@
 							removeCategoryError.textContent = '';
 							removeCategoryForm.reset();
 							removeCategoryModal.close();
-						}, 2000);
+						}, errorTimeout);
 					} else {
 						categories.delete(selectedCategory);
 						expenses.forEach(expense => {
@@ -744,7 +760,6 @@
 							}
 						});
 						//push categories to storage
-						localStorage.setItem('categories', JSON.stringify(Array.from(categories)));
 						renderCategories();
 						renderExpenses();
 						removeCategorySuccess.textContent = 'Category removed successfully';
@@ -752,7 +767,7 @@
 							removeCategorySuccess.textContent = '';
 							removeCategoryModal.close();
 							removeCategoryForm.reset();
-						}, 2000);
+						}, successTimeout);
 					}
 				});
 			})();

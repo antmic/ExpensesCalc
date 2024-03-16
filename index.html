@@ -284,9 +284,9 @@
 				const selectedCategories = Array.from(getElement('categoryFilter').selectedOptions).map(option => option.value);
 				getElement('showCategoryFilter').textContent =
 					selectedCategories[0] !== '' ? 'category (' + selectedCategories.join(', ') + ');' : '';
-				const minAmount = getElement('minAmount').value;
+				const minAmount = Number(getElement('minAmount').value);
 				getElement('showMinAmountFilter').textContent = minAmount ? `min amount (${minAmount});` : '';
-				const maxAmount = getElement('maxAmount').value;
+				const maxAmount = Number(getElement('maxAmount').value);
 				getElement('showMaxAmountFilter').textContent = maxAmount ? `max amount (${maxAmount});` : '';
 				const filteredExpensesLocal = sortedExpensesLocal.filter(expense => {
 					const expenseDate = expense.get('date').slice(0, 7);
@@ -295,8 +295,8 @@
 					return (
 						(!date || expenseDate === date) &&
 						(selectedCategories[0] === '' || selectedCategories.includes(expenseCategory)) &&
-						(!minAmount || expenseAmount >= Number(minAmount)) &&
-						(!maxAmount || expenseAmount <= Number(maxAmount))
+						(!minAmount || expenseAmount >= minAmount) &&
+						(!maxAmount || expenseAmount <= maxAmount)
 					);
 				});
 

@@ -180,7 +180,7 @@
 			<form method="dialog" id="loadDefaultDataForm">
 				<div>
 					Are you sure?<br />
-					It will delete all other data!
+					It will overwrite all data!
 				</div>
 				<div>
 					<input type="checkbox" id="loadDefaultDataCheckbox" />
@@ -290,9 +290,10 @@
 						return category;
 					}
 				});
-				categories = new Set(sanitizedCategories);
+				const result = new Set(sanitizedCategories);
+				categories = result;
 				localStorage.setItem('categories', JSON.stringify(Array.from(categories)));
-				return sanitizedCategories;
+				return result;
 			}
 
 			function sortCategories() {
@@ -326,6 +327,15 @@
 				let option = new Option('', '');
 				option.selected = true;
 				categoryFilter.add(option, 0);
+
+				const btn = getElement('openRemoveCategoryModal');
+				console.log(sanitizedCategoriesLocal);
+				console.log(sanitizedCategoriesLocal.size);
+				if (sanitizedCategoriesLocal.size <= 1) {
+					btn.disabled = true;
+				} else {
+					btn.disabled = false;
+				}
 			}
 
 			function sanitizeExpenses(expensesArr) {
@@ -649,6 +659,8 @@
 					const category = getElement('categoryAddExpense');
 					const amount = getElement('amountAddExpense');
 
+					console.log('date: ', date.value, 'category: ', category.value, 'amount: ', amount.value);
+
 					if (!areAllTruthy(date.value, category.value, amount.value)) {
 						showMessage('All fields are required', false);
 					} else if (!validateDate(date.value)) {
@@ -827,6 +839,8 @@
 					if (getElement('loadDefaultDataCheckbox').checked) {
 						categories = defaultCategories;
 						expenses = defaultExpenses;
+						localStorage.setItem('categories', JSON.stringify(Array.from(categories)));
+						localStorage.setItem('expenses', JSON.stringify(expenses.map(map => Object.fromEntries(map))));
 						renderCategories();
 						renderExpenses();
 						loadDefaultDataModal.close();

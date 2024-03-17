@@ -329,8 +329,6 @@
 				categoryFilter.add(option, 0);
 
 				const btn = getElement('openRemoveCategoryModal');
-				console.log(sanitizedCategoriesLocal);
-				console.log(sanitizedCategoriesLocal.size);
 				if (sanitizedCategoriesLocal.size <= 1) {
 					btn.disabled = true;
 				} else {
@@ -658,8 +656,6 @@
 					const date = getElement('dateAddExpense');
 					const category = getElement('categoryAddExpense');
 					const amount = getElement('amountAddExpense');
-
-					console.log('date: ', date.value, 'category: ', category.value, 'amount: ', amount.value);
 
 					if (!areAllTruthy(date.value, category.value, amount.value)) {
 						showMessage('All fields are required', false);
